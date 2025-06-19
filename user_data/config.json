@@ -1,10 +1,10 @@
 
 {
     "$schema": "https://schema.freqtrade.io/schema.json",
-    "max_open_trades": 3,
+    "max_open_trades": 1, // 1 trade at a time is the best for this bot
     "stake_currency": "USDT",
     "stake_amount": "unlimited",
-    "tradable_balance_ratio": 0.99,
+    "tradable_balance_ratio": 0.99, // 99% of the balance is used for trading
     "fiat_display_currency": "USD",
     "dry_run": true,
     "dry_run_wallet": 1000,
@@ -39,9 +39,9 @@
         "ccxt_config": {},
         "ccxt_async_config": {},
         "pair_whitelist": [
-        //   "SOL/USDT:USDT",
-        // "BTC/USDT:USDT",
-        "ETH/USDT:USDT"
+          "SOL/USDT:USDT",
+          "ETH/USDT:USDT",
+          "SUI/USDT:USDT"
         ],
         "pair_blacklist": [
             "BNB/.*"

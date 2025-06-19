@@ -105,21 +105,12 @@ class GridBotSample(IStrategy):
     # Use bigger than 5% for high volatility markets. This will help in backtesting.
     volatility_threshold = DecimalParameter(0.01, 0.05, default=0.02, space="buy", optimize=True, load=True)
 
-    order_types = {
-        "entry": "limit",
-        "exit": "limit",
-        "stoploss": "market",
-        "stoploss_on_exchange": False,
-    }
-
-    order_time_in_force = {"entry": "GTC", "exit": "GTC"}
-
+    # Grid levels need to pre-defined in the plot_config
+    # Dynamically add in runtime won't work.
     plot_config = {
         "main_plot": {
             "grid_upper": {"color": "red", "type": "line"},
             "grid_lower": {"color": "green", "type": "line"},
-            "support": {"color": "blue", "type": "line"},
-            "resistance": {"color": "purple", "type": "line"},
             "grid_level_-7": {"color": "lightgreen", "type": "line"},
             "grid_level_-6": {"color": "lightgreen", "type": "line"},
             "grid_level_-5": {"color": "lightgreen", "type": "line"},
@@ -137,13 +128,6 @@ class GridBotSample(IStrategy):
             "grid_level_7": {"color": "lightcoral", "type": "line"},
         }
     }
-
-    def informative_pairs(self):
-        """
-        Define additional informative pairs for the strategy
-        Currently not using any additional pairs
-        """
-        return []
 
     def calculate_grid_levels(self, current_price: float, volatility: float) -> tuple:
         """
@@ -256,32 +240,18 @@ class GridBotSample(IStrategy):
                 if grid_lower <= level_price <= grid_upper:
                     print(f"Level {i}: {level_price:.8f} ({level_type})")
 
-        # Calculate support and resistance levels
-        window = 20
-        dataframe['support'] = dataframe['low'].rolling(window=window).min()
-        dataframe['resistance'] = dataframe['high'].rolling(window=window).max()
-
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        """
-        Define entry conditions for the strategy
-        
-        Args:
-            dataframe: OHLCV data with indicators
-            metadata: Additional pair metadata
-            
-        Returns:
-            DataFrame with entry signals
-        """
+
         dataframe.loc[
             (
                 # Market microstructure conditions
                 (dataframe["spread_ratio"] < self.min_spread_ratio.value * 2)  # Check for reasonable spreads
                 & (dataframe["volatility_regime"] == 0)  # Only trade in normal volatility
-                & (dataframe["close"] > dataframe["grid_lower"])  # Price within grid bounds
-                & (dataframe["close"] < dataframe["grid_upper"])  # Price within grid bounds
+                & (dataframe["close"] >= dataframe["grid_lower"])  # Price within grid bounds
                 & (dataframe["volume"] >= self.min_volume_threshold.value)  # Ensure sufficient market activity
+                & (dataframe["close"] < dataframe["grid_level_0"])  # Only enter if price is below grid_level_0
             ),
             "enter_long",
         ] = 1
@@ -289,23 +259,14 @@ class GridBotSample(IStrategy):
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        """
-        Define exit conditions for the strategy
-        
-        Args:
-            dataframe: OHLCV data with indicators
-            metadata: Additional pair metadata
-            
-        Returns:
-            DataFrame with exit signals
-        """
+
         dataframe.loc[
             (
                 # Market microstructure conditions
                 (dataframe["volatility_regime"] == 1)  # Exit in high volatility
                 | (dataframe["spread_ratio"] > self.min_spread_ratio.value * 3)  # Exit on wide spreads
-                | (dataframe["close"] >= dataframe["grid_upper"])  # Exit above grid
-                | (dataframe["close"] <= dataframe["grid_lower"])  # Exit below grid
+                | (dataframe["close"] >= dataframe["grid_level_7"])  # Exit above grid
+                | (dataframe["close"] <= dataframe["grid_level_-7"])
                 | (dataframe["volume"] < self.min_volume_threshold.value)  # Exit if insufficient market activity
             ),
             "exit_long",
